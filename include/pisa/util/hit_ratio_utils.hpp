@@ -21,6 +21,9 @@ using SubStructure = std::tuple<QueryStr, QueryStr, QueryStr, QueryStr>;
 #include <unordered_map>
 #include <queue>
 #include <boost/algorithm/string.hpp>
+
+#include <dirent.h>
+#include <typeinfo>
 // #include "utils.hpp"
 
 template <typename item>
@@ -142,6 +145,27 @@ std::vector<std::string> intersection(std::vector<std::string> & v1,
     return v3;
 }
 
+template <typename sum_type>
+sum_type vec_sum(std::vector<sum_type> & v)
+{
+    sum_type result;
+    for (auto i: v)
+    {
+        result += i;
+    }
+    return result;
+}
+
+template <typename v_type>
+void print(std::vector<v_type> & v)
+{
+    std::cout << '[';
+    for (auto i: v)
+    {
+        std::cout << " " << i;
+    }
+    std::cout << ']\n';
+}
 
 class HitRatioHeap {
   public:
@@ -303,7 +327,8 @@ class HitRatioHeap {
                 std::vector<std::string> lst_intersection = intersection(lst_real, lst_pred);
                 if (lst_real.size() == 0)
                 {
-                    dict_query_acc[top_k].emplace_back(NULL);
+                    // dict_query_acc[top_k].emplace_back(NULL);
+                    dict_query_acc[top_k].emplace_back(-1.0);
                 }
                 else
                 {
@@ -314,6 +339,90 @@ class HitRatioHeap {
 
         }
         return dict_query_acc;
+    }
+
+    void compute_heap_accuracy(const std::string query_set_path, std::vector<int> lst_budget, std::vector<int> lst_top_k, std::vector<int> lst_type, std::string index_path)
+    {
+        this->lst_budget = lst_budget;
+        std::vector<std::string> lst_files;
+
+        DIR *dpdf;
+        struct dirent *epdf;
+        char* qsp = const_cast<char*>(query_set_path.c_str());
+        dpdf = opendir(qsp);
+        if (dpdf != NULL) {
+            while (epdf = readdir(dpdf)) {
+                lst_files.emplace_back(std::string(epdf->d_name));
+            }
+        }
+
+//        std::sort(lst_files.begin(), lst_files.end());
+//        for (auto filename: lst_files)
+//        {
+//            std::cout << filename << '\n';
+//        }
+
+        std::unordered_map<int, std::vector<double>> dict_avg_acc = {};
+        std::unordered_map<int, std::vector<std::vector<double>*>*> dict_aux_lst = {};
+
+        for (auto top_k: lst_top_k)
+        {
+            dict_avg_acc[top_k] = {};
+            std::vector<std::vector<double>*> tmp_vec;
+            dict_aux_lst[top_k] = &tmp_vec;
+        }
+
+        for (auto top_k: lst_top_k)
+        {
+            for (int i = 0; i < lst_budget.size(); ++i)
+            {
+                std::vector<double> tmp_vec;
+                dict_aux_lst[top_k]->emplace_back(&tmp_vec);
+            }
+        }
+
+        for (auto test_file: lst_files)
+        {
+            std::unordered_map<int, std::vector<double>> dict_query_acc = this->hit_ratio_heap(test_file, lst_budget, lst_top_k, lst_type, index_path, query_set_path);
+            for (std::pair<int, std::vector<double>> element : dict_query_acc)
+            {
+                std::cout << "A\n";
+                int top_k = element.first;
+                std::vector<double> lst_query_acc = element.second;
+                std::cout << "B\n";
+                for (int i = 0; i < lst_budget.size(); ++i)
+                {
+                    std::cout << "C\n";
+                    if (lst_query_acc.at(i) != -1)
+                    {
+                        std::cout << "D\n";
+                        std::cout << "dict_aux_lst[top_k]->at(i) " << dict_aux_lst[top_k]->at(i) << '\n';
+                        dict_aux_lst[top_k].at(i)->emplace_back(lst_query_acc.at(i));
+                        std::cout << "E\n";
+                    }
+                }
+            }
+        }
+
+        for (std::pair<int, std::vector<std::vector<double>*>*> element: dict_aux_lst)
+        {
+            int top_k = element.first;
+            std::vector<std::vector<double>*>* v = element.second;
+            for (int i = 0; i < v->size(); ++i)
+            {
+                double sum_of_acc = vec_sum<double>(*v->at(i));
+                dict_avg_acc[top_k].emplace_back(sum_of_acc / v->at(i)->size());
+            }
+        }
+
+        for (std::pair<int, std::vector<double>> element: dict_avg_acc)
+        {
+            int top_k = element.first;
+            std::vector<double> v = element.second;
+            std::cout << "When k = " << top_k << '\n';
+            print<double>(v);
+        }
+
     }
   private:
     std::vector<int> lst_budget = {};

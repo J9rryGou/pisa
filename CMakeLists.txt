@@ -15,6 +15,7 @@ option(PISA_ENABLE_CLANG_TIDY "Enable static analysis with clang-tidy" OFF)
 option(PISA_CLANG_TIDY_EXECUTABLE "clang-tidy executable path" "clang-tidy")
 option(PISA_USE_PIC "Enable Position-Independent code globally" ON)
 option(PISA_CI_BUILD "Remove debug information from Debug build" ON)
+option(PISA_ENFORCE_GDB "Use gdb mode for Debug" ON)
 
 if(PISA_USE_PIC)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -27,14 +28,18 @@ if(PISA_CI_BUILD)
 endif()
 
 configure_file(
-  ${PISA_SOURCE_DIR}/include/pisa/pisa_config.hpp.in
-  ${PISA_SOURCE_DIR}/include/pisa/pisa_config.hpp
-  ESCAPE_QUOTES)
+        ${PISA_SOURCE_DIR}/include/pisa/pisa_config.hpp.in
+        ${PISA_SOURCE_DIR}/include/pisa/pisa_config.hpp
+        ESCAPE_QUOTES)
 
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release")
+    set(CMAKE_BUILD_TYPE "Release")
 endif()
-MESSAGE( STATUS "CMAKE_BUILD_TYPE: " ${CMAKE_BUILD_TYPE} )
+if(PISA_ENFORCE_GDB)
+    SET(CMAKE_BUILD_TYPE "Debug")
+    SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
+    MESSAGE( STATUS "CMAKE_BUILD_TYPE: " ${CMAKE_BUILD_TYPE})
+endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -48,34 +53,34 @@ find_package(TBB REQUIRED tbb)
 
 include(ExternalProject)
 ExternalProject_Add(gumbo-external
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/gumbo-parser
-    BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/gumbo-parser
-    CONFIGURE_COMMAND ./autogen.sh && ./configure --prefix=${CMAKE_BINARY_DIR}/gumbo-parser CFLAGS=${GUMBO_CFLAGS} CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER}
-	BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/gumbo-parser/lib/libgumbo.a
-    BUILD_COMMAND ${MAKE})
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/gumbo-parser
+        BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/gumbo-parser
+        CONFIGURE_COMMAND ./autogen.sh && ./configure --prefix=${CMAKE_BINARY_DIR}/gumbo-parser CFLAGS=${GUMBO_CFLAGS} CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER}
+        BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/gumbo-parser/lib/libgumbo.a
+        BUILD_COMMAND ${MAKE})
 add_library(gumbo::gumbo STATIC IMPORTED)
 set_property(TARGET gumbo::gumbo APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/gumbo-parser/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/gumbo-parser/src)
 set_property(TARGET gumbo::gumbo APPEND PROPERTY INCLUDE_DIRECTORIES
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/gumbo-parser/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/gumbo-parser/src)
 set_property(TARGET gumbo::gumbo APPEND PROPERTY IMPORTED_LOCATION
-    ${CMAKE_BINARY_DIR}/gumbo-parser/lib/libgumbo.a)
+        ${CMAKE_BINARY_DIR}/gumbo-parser/lib/libgumbo.a)
 add_dependencies( gumbo::gumbo gumbo-external )
 
 if (UNIX)
-   # For hardware popcount and other special instructions
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+    # For hardware popcount and other special instructions
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
-   # Extensive warnings
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-missing-braces")
+    # Extensive warnings
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-missing-braces")
 
-   if (USE_SANITIZERS)
-     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
-   endif ()
+    if (USE_SANITIZERS)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+    endif ()
 
-   if(NOT PISA_CI_BUILD)
-     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb") # Add debug info anyway
-   endif()
+    if(NOT PISA_CI_BUILD)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb") # Add debug info anyway
+    endif()
 
 endif()
 
@@ -87,6 +92,7 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+# file(GLOB_RECURSE PISA_SRC_FILES FOLLOW_SYMLINKS "src/*cpp" "hit_ratio/tools/*cpp")
 file(GLOB_RECURSE PISA_SRC_FILES FOLLOW_SYMLINKS "src/*cpp")
 list(SORT PISA_SRC_FILES)
 
@@ -99,13 +105,15 @@ if (PISA_ENABLE_CLANG_TIDY)
     endif()
 endif()
 
+# add_subdirectory(hit_ratio)
+# include_directories(hit_ratio)
 include_directories(include)
-add_library(pisa ${PISA_SRC_FILES})
+add_library(pisa ${PISA_SRC_FILES} )
 target_include_directories(pisa PUBLIC
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/pisa>
-)
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/pisa>
+        )
 target_link_libraries(pisa
-    PUBLIC
+        PUBLIC
         Threads::Threads
         Boost::boost
         mio
@@ -117,20 +125,20 @@ target_link_libraries(pisa
         range-v3
         taily
         TBB::tbb
-    # These should be made private in the future:
+        # These should be made private in the future:
         FastPFor
         streamvbyte
         MaskedVByte
         simdcomp
         QMX
-    PRIVATE
+        PRIVATE
         gumbo::gumbo
         warcpp
         wapopp
         trecpp
         Porter2
         KrovetzStemmer
-)
+        )
 target_include_directories(pisa PUBLIC external)
 
 if (PISA_BUILD_TOOLS)
@@ -139,10 +147,10 @@ endif()
 
 if (PISA_ENABLE_TESTING AND BUILD_TESTING)
     if (ENABLE_COVERAGE)
-	# Add code coverage
-	list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/external/CMake-codecov/cmake")
-	find_package(codecov)
-	list(APPEND LCOV_REMOVE_PATTERNS "'${PROJECT_SOURCE_DIR}/external/*'")
+        # Add code coverage
+        list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/external/CMake-codecov/cmake")
+        find_package(codecov)
+        list(APPEND LCOV_REMOVE_PATTERNS "'${PROJECT_SOURCE_DIR}/external/*'")
     endif()
 
     enable_testing()
@@ -150,52 +158,52 @@ if (PISA_ENABLE_TESTING AND BUILD_TESTING)
 endif()
 
 if (PISA_ENABLE_BENCHMARKING)
-  add_subdirectory(benchmarks)
+    add_subdirectory(benchmarks)
 endif()
 
 
 if(PISA_COMPILE_HEADERS)
-  get_property(PISA_INTERFACE_INCLUDE_DIRECTORIES TARGET pisa PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-  list(APPEND PISA_INCLUDE_DIRECTORIES ${PISA_INTERFACE_INCLUDE_DIRECTORIES})
-  get_property(PISA_INTERFACE_LINK_LIBRARIES TARGET pisa PROPERTY INTERFACE_LINK_LIBRARIES)
-  foreach(PISA_INTERFACE_LINK_LIBRARY ${PISA_INTERFACE_LINK_LIBRARIES})
-    if(NOT PISA_INTERFACE_LINK_LIBRARY MATCHES ".*LINK_ONLY.*")
-      get_property(PISA_INTERFACE_LINK_LIBRARY_TYPE TARGET ${PISA_INTERFACE_LINK_LIBRARY} PROPERTY TYPE)
-      if(PISA_INTERFACE_LINK_LIBRARY_TYPE STREQUAL "INTERFACE_LIBRARY")
-        get_property(PISA_INTERFACE_INCLUDE_DIRECTORIES TARGET ${PISA_INTERFACE_LINK_LIBRARY} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-        list(APPEND PISA_INCLUDE_DIRECTORIES ${PISA_INTERFACE_INCLUDE_DIRECTORIES})
-      else ()
-        get_property(PISA_INTERFACE_INCLUDE_DIRECTORIES TARGET ${PISA_INTERFACE_LINK_LIBRARY} PROPERTY INCLUDE_DIRECTORIES)
-        list(APPEND PISA_INCLUDE_DIRECTORIES ${PISA_INTERFACE_INCLUDE_DIRECTORIES})
-      endif()
-    endif()
-  endforeach()
+    get_property(PISA_INTERFACE_INCLUDE_DIRECTORIES TARGET pisa PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+    list(APPEND PISA_INCLUDE_DIRECTORIES ${PISA_INTERFACE_INCLUDE_DIRECTORIES})
+    get_property(PISA_INTERFACE_LINK_LIBRARIES TARGET pisa PROPERTY INTERFACE_LINK_LIBRARIES)
+    foreach(PISA_INTERFACE_LINK_LIBRARY ${PISA_INTERFACE_LINK_LIBRARIES})
+        if(NOT PISA_INTERFACE_LINK_LIBRARY MATCHES ".*LINK_ONLY.*")
+            get_property(PISA_INTERFACE_LINK_LIBRARY_TYPE TARGET ${PISA_INTERFACE_LINK_LIBRARY} PROPERTY TYPE)
+            if(PISA_INTERFACE_LINK_LIBRARY_TYPE STREQUAL "INTERFACE_LIBRARY")
+                get_property(PISA_INTERFACE_INCLUDE_DIRECTORIES TARGET ${PISA_INTERFACE_LINK_LIBRARY} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+                list(APPEND PISA_INCLUDE_DIRECTORIES ${PISA_INTERFACE_INCLUDE_DIRECTORIES})
+            else ()
+                get_property(PISA_INTERFACE_INCLUDE_DIRECTORIES TARGET ${PISA_INTERFACE_LINK_LIBRARY} PROPERTY INCLUDE_DIRECTORIES)
+                list(APPEND PISA_INCLUDE_DIRECTORIES ${PISA_INTERFACE_INCLUDE_DIRECTORIES})
+            endif()
+        endif()
+    endforeach()
 
-  include(CheckCXXSourceCompiles)
-  set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${CMAKE_CXX_STANDARD} -c")
-  get_property(PISA_INTERFACE_INCLUDE_DIRECTORIES TARGET pisa PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-  set(CMAKE_REQUIRED_INCLUDES "${CMAKE_SOURCE_DIR}/external/tbb/include" ${PISA_INCLUDE_DIRECTORIES})
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS} -std=c++${CMAKE_CXX_STANDARD} -c")
+    get_property(PISA_INTERFACE_INCLUDE_DIRECTORIES TARGET pisa PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+    set(CMAKE_REQUIRED_INCLUDES "${CMAKE_SOURCE_DIR}/external/tbb/include" ${PISA_INCLUDE_DIRECTORIES})
 
-  file(GLOB_RECURSE PISA_HEADER_FILES FOLLOW_SYMLINKS "include/pisa/*.hpp")
-  list(SORT PISA_HEADER_FILES)
+    file(GLOB_RECURSE PISA_HEADER_FILES FOLLOW_SYMLINKS "include/pisa/*.hpp")
+    list(SORT PISA_HEADER_FILES)
 
-  foreach(file ${PISA_HEADER_FILES})
-    # replace / to _ to fix warnings
-    string(REPLACE "/" "_" compilename "${file}")
-    string(REPLACE "." "_" compilename "${compilename}")
+    foreach(file ${PISA_HEADER_FILES})
+        # replace / to _ to fix warnings
+        string(REPLACE "/" "_" compilename "${file}")
+        string(REPLACE "." "_" compilename "${compilename}")
 
-    if(NOT IsSelfContained${compilename})
-      unset(IsSelfContained${compilename} CACHE)
-    endif()
+        if(NOT IsSelfContained${compilename})
+            unset(IsSelfContained${compilename} CACHE)
+        endif()
 
-    check_cxx_source_compiles(
-      "#include \"${file}\"
+        check_cxx_source_compiles(
+                "#include \"${file}\"
       int main() { return 0; }" IsSelfContained${compilename})
 
-    if(NOT IsSelfContained${compilename})
-      message(FATAL_ERROR
-        "Compilation FAILED for ${file}\nCompiler output:\n${OUTPUT}")
-    endif()
-  endforeach()
+        if(NOT IsSelfContained${compilename})
+            message(FATAL_ERROR
+                    "Compilation FAILED for ${file}\nCompiler output:\n${OUTPUT}")
+        endif()
+    endforeach()
 
 endif(PISA_COMPILE_HEADERS)

@@ -97,6 +97,7 @@ namespace arg {
                 ->needs(m_terms_option);
             app->add_option("--stemmer", m_stemmer, "Stemmer type")->needs(m_terms_option);
             app->add_flag("--weighted", m_weighted, "Weights scores by query frequency");
+            app->add_option("--lookupq", m_single_query, "Single term to look up");
 
             if constexpr (Mode == QueryMode::Ranked) {
                 app->add_option("-k", m_k, "The number of top results to return")->required();
@@ -124,6 +125,22 @@ namespace arg {
             return q;
         }
 
+        [[nodiscard]] auto lookup() const -> ::pisa::Query
+        {
+            std::vector<::pisa::Query> q;
+            auto parse_query = resolve_query_parser(q, m_term_lexicon, m_stop_words, m_stemmer);
+            parse_query(m_single_query);
+            return q[0];
+        }
+
+        [[nodiscard]] auto lookup(std::string input_q) const -> ::pisa::Query
+        {
+            std::vector<::pisa::Query> q;
+            auto parse_query = resolve_query_parser(q, m_term_lexicon, m_stop_words, m_stemmer);
+            parse_query(input_q);
+            return q[0];
+        }
+
         [[nodiscard]] auto k() const -> int { return m_k; }
 
         [[nodiscard]] auto weighted() const -> bool { return m_weighted; }
@@ -133,6 +150,8 @@ namespace arg {
         void override_term_lexicon(std::string term_lexicon) { m_term_lexicon = term_lexicon; }
 
       private:
+        std::string m_single_query;
+
         std::optional<std::string> m_query_file;
         int m_k = 0;
         bool m_weighted = false;

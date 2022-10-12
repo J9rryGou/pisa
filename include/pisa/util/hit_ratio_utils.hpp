@@ -18,14 +18,13 @@ using SubStructure = std::tuple<QueryStr, QueryStr, QueryStr, QueryStr>;
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <filesystem>
-#include <unordered_map>
 #include <queue>
 #include <boost/algorithm/string.hpp>
 
 #include <dirent.h>
 #include <typeinfo>
 #include <boost/ptr_container/ptr_vector.hpp>
-
+#include <range/v3/all.hpp>
 // function for print time
 #include <cstdio>
 #include <cstdlib>
@@ -39,7 +38,7 @@ void makeCombiUtil(std::vector<std::string >& ans,
     // Pushing this vector to a vector of vector
     if (k == 0) {
         std::string joinedString = boost::algorithm::join(tmp, " ");
-        ans.push_back(std::move(joinedString));
+        ans.emplace_back(std::move(joinedString));
         return;
     }
 
@@ -47,7 +46,7 @@ void makeCombiUtil(std::vector<std::string >& ans,
     // left will be 1
     for (int i = left; i < n; ++i)
     {
-        tmp.push_back(std::move(q_terms[i]));
+        tmp.emplace_back(std::move(q_terms[i]));
         makeCombiUtil<item>(ans, tmp, q_terms, n, i + 1, k - 1);
 
         // Popping out last inserted element
@@ -298,10 +297,6 @@ class HitRatioHeap {
         }
 
         std::for_each(f_grams.begin(), f_grams.end(), [&](std::shared_ptr<std::ifstream> & p){p->close();});
-//        for(auto i : f_grams)
-//        {
-//            i->close();
-//        }
 
         int max_top_k = *std::max_element(lst_top_k.begin(), lst_top_k.end());
         std::vector<std::string> lst_real_did;
@@ -326,24 +321,31 @@ class HitRatioHeap {
         {
             dict_query_acc[top_k] = {};
             int real_len_to_slice = std::min(top_k, int(lst_real_did.size()));
-            std::vector<std::string> lst_real = std::vector<std::string>(lst_real_did.begin(), lst_real_did.begin() + real_len_to_slice);
+            auto lst_real = lst_real_did | ranges::views::slice(0, real_len_to_slice);
+            ranges::sort(lst_real);
+//            std::vector<std::string> lst_real = std::vector<std::string>(lst_real_did.begin(), lst_real_did.begin() + real_len_to_slice);
             // std::cout << "Top k size: " << lst_real.size() << '\n';
             // std::vector<std::string> lst_real = std::vector<std::string>(lst_real_did.begin(), lst_real_did.begin() + real_len_to_slice);
             for (auto temp_budget: lst_budget)
             {
                 int pred_len_to_slice = std::min(temp_budget, int(lst_pred_did.size()));
-                std::vector<std::string> lst_pred = std::vector<std::string>(lst_pred_did.begin(), lst_pred_did.begin() + pred_len_to_slice);
+                auto lst_pred = lst_pred_did | ranges::views::slice(0, pred_len_to_slice);
+                ranges::sort(lst_pred);
+//                std::vector<std::string> lst_pred = std::vector<std::string>(lst_pred_did.begin(), lst_pred_did.begin() + pred_len_to_slice);
                 // std::vector<std::string> lst_pred = std::vector<std::string>(lst_pred_did.begin(), lst_pred_did.begin() + pred_len_to_slice);
-                std::vector<std::string> lst_intersection = intersection(lst_real, lst_pred);
+//                std::vector<std::string> lst_intersection = intersection(lst_real, lst_pred);
+                auto lst_intersection = ranges::views::set_intersection(lst_real, lst_pred);
+                int a = 0;
+                ranges::for_each(lst_intersection, [&a](std::string & s){a++;});
                 if (lst_real.size() == 0)
                 {
                     // dict_query_acc[top_k].emplace_back(NULL);
-                    dict_query_acc[top_k].emplace_back(-1.0);
+                    dict_query_acc[top_k].emplace_back(0.0);
                 }
                 else
                 {
                     // std::cout << "For top_k = " << top_k << ": " << lst_intersection.size() << " " << lst_real.size() << " " << "acc is " << double(lst_intersection.size()) / double(lst_real.size()) << '\n';
-                    dict_query_acc[top_k].emplace_back(double(lst_intersection.size()) / double(lst_real.size()));
+                    dict_query_acc[top_k].emplace_back(double(a) / double(lst_real.size()));
                 }
             }
 

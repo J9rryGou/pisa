@@ -48,7 +48,7 @@ void makeCombiUtil(std::vector<std::string >& ans,
     // left will be 1
     for (int i = left; i < n; ++i)
     {
-        tmp.emplace_back(std::move(q_terms[i]));
+        tmp.emplace_back(q_terms[i]);
         makeCombiUtil<item>(ans, tmp, q_terms, n, i + 1, k - 1);
 
         // Popping out last inserted element

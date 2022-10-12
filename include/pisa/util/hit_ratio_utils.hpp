@@ -24,11 +24,12 @@ using SubStructure = std::tuple<QueryStr, QueryStr, QueryStr, QueryStr>;
 
 #include <dirent.h>
 #include <typeinfo>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 // function for print time
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
 // #include "utils.hpp"
 
 template <typename item>
@@ -38,7 +39,7 @@ void makeCombiUtil(std::vector<std::string >& ans,
     // Pushing this vector to a vector of vector
     if (k == 0) {
         std::string joinedString = boost::algorithm::join(tmp, " ");
-        ans.push_back(joinedString);
+        ans.push_back(std::move(joinedString));
         return;
     }
 
@@ -46,7 +47,7 @@ void makeCombiUtil(std::vector<std::string >& ans,
     // left will be 1
     for (int i = left; i < n; ++i)
     {
-        tmp.push_back(q_terms.at(i));
+        tmp.push_back(std::move(q_terms[i]));
         makeCombiUtil<item>(ans, tmp, q_terms, n, i + 1, k - 1);
 
         // Popping out last inserted element
@@ -95,8 +96,8 @@ struct obj_posting
 {
     std::string did;
     double impact_score;
-    std::ifstream * file_reader;
-    obj_posting(std::string did, double impact_score, std::ifstream * file_reader)
+    std::shared_ptr<std::ifstream> file_reader;
+    obj_posting(std::string did, double impact_score, std::shared_ptr<std::ifstream> file_reader)
         : did(did), impact_score(impact_score), file_reader(file_reader)
     {}
     //    obj_posting(std::string did, double impact_score, std::ifstream * file_reader) {
@@ -189,7 +190,7 @@ class HitRatioHeap {
         boost::split(tmp_string, query_name, boost::is_any_of("_"));
         boost::split(q_terms, tmp_string.back(), boost::is_any_of(" "));
         SubStructure sub_structure = get_grams(q_terms, lst_type);
-        std::vector<std::ifstream *> f_grams;
+        std::vector<std::shared_ptr<std::ifstream>> f_grams;
         std::vector<std::string> f_names;
         int cnt_valid_gram = 0;
         for (auto & i : std::get<0>(sub_structure))
@@ -201,7 +202,7 @@ class HitRatioHeap {
                 ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/single/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
-                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/single/" + filename);
+                std::shared_ptr<std::ifstream> tmp_file_reader(new std::ifstream(index_path + "/single/" + filename));
                 f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/single/" + filename));
             }
@@ -216,7 +217,7 @@ class HitRatioHeap {
                 ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/duplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
-                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/duplet/" + filename);
+                std::shared_ptr<std::ifstream> tmp_file_reader(new std::ifstream(index_path + "/duplet/" + filename));
                 f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/duplet/" + filename));
             }
@@ -231,7 +232,8 @@ class HitRatioHeap {
                 ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/triplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
-                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/triplet/" + filename);
+                std::shared_ptr<std::ifstream> tmp_file_reader(new std::ifstream(index_path + "/triplet/" + filename));
+//                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/triplet/" + filename);
                 f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/triplet/" + filename));
             }
@@ -246,7 +248,7 @@ class HitRatioHeap {
                 ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/quadruplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
-                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/quadruplet/" + filename);
+                std::shared_ptr<std::ifstream> tmp_file_reader(new std::ifstream(index_path + "/quadruplet/" + filename));
                 f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/quadruplet/" + filename));
             }
@@ -267,8 +269,9 @@ class HitRatioHeap {
                 boost::algorithm::trim(line);
                 boost::split(line_list, line, boost::is_any_of(" "));
                 double score_raw = std::stod(line_list[2]);
+                obj_posting obj(line_list[1], score_raw, i);
                 // std::cout << "Score is " << line_list[2] << " " << score_raw << '\n';
-                hp_posting.push(obj_posting(line_list[1], score_raw, i));
+                hp_posting.push(std::move(obj));
             }
         }
 
@@ -289,14 +292,16 @@ class HitRatioHeap {
                 boost::algorithm::trim(line);
                 boost::split(line_list, line, boost::is_any_of(" "));
                 double score_raw = std::stod(line_list[2]);
-                hp_posting.push(obj_posting(line_list[1], score_raw, current_obj.file_reader));
+                obj_posting obj(line_list[1], score_raw, current_obj.file_reader);
+                hp_posting.push(std::move(obj));
             }
         }
 
-        for(auto i : f_grams)
-        {
-            i->close();
-        }
+        std::for_each(f_grams.begin(), f_grams.end(), [&](std::shared_ptr<std::ifstream> & p){p->close();});
+//        for(auto i : f_grams)
+//        {
+//            i->close();
+//        }
 
         int max_top_k = *std::max_element(lst_top_k.begin(), lst_top_k.end());
         std::vector<std::string> lst_real_did;
@@ -309,7 +314,7 @@ class HitRatioHeap {
             std::vector<std::string> line_list;
             boost::algorithm::trim(line);
             boost::split(line_list, line, boost::is_any_of(" "));
-            lst_real_did.emplace_back(line_list[1]);
+            lst_real_did.emplace_back(std::move(line_list[1]));
             cnt_top += 1;
         }
         f_real_output.close();
@@ -368,12 +373,12 @@ class HitRatioHeap {
 //        }
 
         std::unordered_map<int, std::vector<double>> dict_avg_acc = {};
-        std::unordered_map<int, std::vector<std::vector<double>*>*> dict_aux_lst = {};
+        std::unordered_map<int, std::vector<std::vector<double>>> dict_aux_lst = {};
 
         for (auto top_k: lst_top_k)
         {
             dict_avg_acc[top_k] = {};
-            std::vector<std::vector<double>*> * tmp_vec = new std::vector<std::vector<double>*>;
+            std::vector<std::vector<double>> tmp_vec = {};
             dict_aux_lst[top_k] = tmp_vec;
         }
 
@@ -381,8 +386,8 @@ class HitRatioHeap {
         {
             for (int i = 0; i < lst_budget.size(); ++i)
             {
-                std::vector<double> * tmp_vec = new std::vector<double>;
-                dict_aux_lst[top_k]->emplace_back(tmp_vec);
+                std::vector<double> tmp_vec = {};
+                dict_aux_lst[top_k].emplace_back(tmp_vec);
             }
         }
 
@@ -396,10 +401,10 @@ class HitRatioHeap {
                 std::vector<double> lst_query_acc = element.second;
                 for (int i = 0; i < lst_budget.size(); ++i)
                 {
-                    if (lst_query_acc.at(i) != -1)
+                    if (lst_query_acc[i] != -1)
                     {
                         // std::cout << "dict_aux_lst[top_k]->at(i) " << dict_aux_lst[top_k]->at(i) << '\n';
-                        dict_aux_lst[top_k]->at(i)->emplace_back(lst_query_acc.at(i));
+                        dict_aux_lst[top_k][i].emplace_back(lst_query_acc[i]);
                     }
                 }
             }
@@ -411,14 +416,14 @@ class HitRatioHeap {
             }
         }
 
-        for (std::pair<int, std::vector<std::vector<double>*>*> element: dict_aux_lst)
+        for (std::pair<int, std::vector<std::vector<double>>> element: dict_aux_lst)
         {
             int top_k = element.first;
-            std::vector<std::vector<double>*>* v = element.second;
-            for (int i = 0; i < v->size(); ++i)
+            std::vector<std::vector<double>> v = element.second;
+            for (int i = 0; i < v.size(); ++i)
             {
-                double sum_of_acc = vec_sum<double>(*v->at(i));
-                dict_avg_acc[top_k].emplace_back(sum_of_acc / v->at(i)->size());
+                double sum_of_acc = vec_sum<double>(v[i]);
+                dict_avg_acc[top_k].emplace_back(sum_of_acc / v[i].size());
             }
         }
 

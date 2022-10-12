@@ -138,7 +138,6 @@ target_link_libraries(pisa
         trecpp
         Porter2
         KrovetzStemmer
-        iter
         )
 target_include_directories(pisa PUBLIC external)
 

@@ -25,10 +25,12 @@ using SubStructure = std::tuple<QueryStr, QueryStr, QueryStr, QueryStr>;
 #include <typeinfo>
 #include <boost/ptr_container/ptr_vector.hpp>
 #include <range/v3/all.hpp>
+#include <cppitertools/combinations.hpp>
 // function for print time
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <numeric>
 // #include "utils.hpp"
 
 template <typename item>
@@ -72,19 +74,51 @@ SubStructure get_grams(std::vector<std::string> & q_terms, std::vector<int> & ls
     std::vector<std::string>lst_single, lst_duplet, lst_triplet, lst_quadruplet;
 
     if (std::find(lst_type.begin(), lst_type.end(), 1) != lst_type.end()) {
+//        for (auto&& ns : iter::combinations(q_terms,1)) {
+//            std::string substructure("");
+//            for (auto&& j : ns ) {
+//                substructure += j + " ";
+//            }
+//            substructure.pop_back();
+//            lst_single.emplace_back(substructure);
+//        }
         lst_single = makeCombi<std::string>(q_terms, 1);
     }
 
     if (std::find(lst_type.begin(), lst_type.end(), 2) != lst_type.end()) {
         lst_duplet = makeCombi<std::string>(q_terms, 2);
+//        for (auto&& ns : iter::combinations(q_terms,2)) {
+//            std::string substructure("");
+//            for (auto&& j : ns ) {
+//                substructure += j + " ";
+//            }
+//            substructure.pop_back();
+//            lst_duplet.emplace_back(substructure);
+//        }
     }
 
     if (std::find(lst_type.begin(), lst_type.end(), 3) != lst_type.end()) {
         lst_triplet = makeCombi<std::string>(q_terms, 3);
+//        for (auto&& ns : iter::combinations(q_terms,3)) {
+//            std::string substructure("");
+//            for (auto&& j : ns ) {
+//                substructure += j + " ";
+//            }
+//            substructure.pop_back();
+//            lst_triplet.emplace_back(substructure);
+//        }
     }
 
     if (std::find(lst_type.begin(), lst_type.end(), 4) != lst_type.end()) {
         lst_quadruplet = makeCombi<std::string>(q_terms, 4);
+//        for (auto&& ns : iter::combinations(q_terms,4)) {
+//            std::string substructure("");
+//            for (auto&& j : ns ) {
+//                substructure += j + " ";
+//            }
+//            substructure.pop_back();
+//            lst_quadruplet.emplace_back(substructure);
+//        }
     }
 
     return std::make_tuple(lst_single, lst_duplet, lst_triplet, lst_quadruplet);
@@ -424,7 +458,8 @@ class HitRatioHeap {
             std::vector<std::vector<double>> v = element.second;
             for (int i = 0; i < v.size(); ++i)
             {
-                double sum_of_acc = vec_sum<double>(v[i]);
+//                double sum_of_acc = vec_sum<double>(v[i]);
+                double sum_of_acc = std::accumulate(v[i].begin(), v[i].end(), 0);
                 dict_avg_acc[top_k].emplace_back(sum_of_acc / v[i].size());
             }
         }

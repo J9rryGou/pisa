@@ -374,7 +374,7 @@ class HitRatioHeap {
                 if (lst_real.size() == 0)
                 {
                     // dict_query_acc[top_k].emplace_back(NULL);
-                    dict_query_acc[top_k].emplace_back(0.0);
+                    dict_query_acc[top_k].emplace_back(-1.0);
                 }
                 else
                 {
@@ -456,11 +456,11 @@ class HitRatioHeap {
         {
             int top_k = element.first;
             std::vector<std::vector<double>> v = element.second;
-            for (int i = 0; i < v.size(); ++i)
+            for (auto & i : v)
             {
 //                double sum_of_acc = vec_sum<double>(v[i]);
-                double sum_of_acc = std::accumulate(v[i].begin(), v[i].end(), 0);
-                dict_avg_acc[top_k].emplace_back(sum_of_acc / v[i].size());
+                double sum_of_acc = std::accumulate(i.begin(), i.end(), 0);
+                dict_avg_acc[top_k].emplace_back(sum_of_acc / i.size());
             }
         }
 

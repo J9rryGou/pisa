@@ -24,6 +24,11 @@ using SubStructure = std::tuple<QueryStr, QueryStr, QueryStr, QueryStr>;
 
 #include <dirent.h>
 #include <typeinfo>
+
+// function for print time
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 // #include "utils.hpp"
 
 template <typename item>
@@ -159,12 +164,12 @@ sum_type vec_sum(std::vector<sum_type> & v)
 template <typename v_type>
 void print(std::vector<v_type> & v)
 {
-    std::cout << '[';
+    std::cout << "[";
     for (auto i: v)
     {
         std::cout << " " << i;
     }
-    std::cout << ']\n';
+    std::cout << "]\n";
 }
 
 class HitRatioHeap {
@@ -368,39 +373,41 @@ class HitRatioHeap {
         for (auto top_k: lst_top_k)
         {
             dict_avg_acc[top_k] = {};
-            std::vector<std::vector<double>*> tmp_vec;
-            dict_aux_lst[top_k] = &tmp_vec;
+            std::vector<std::vector<double>*> * tmp_vec = new std::vector<std::vector<double>*>;
+            dict_aux_lst[top_k] = tmp_vec;
         }
 
         for (auto top_k: lst_top_k)
         {
             for (int i = 0; i < lst_budget.size(); ++i)
             {
-                std::vector<double> tmp_vec;
-                dict_aux_lst[top_k]->emplace_back(&tmp_vec);
+                std::vector<double> * tmp_vec = new std::vector<double>;
+                dict_aux_lst[top_k]->emplace_back(tmp_vec);
             }
         }
 
+        int cnt_file = 0;
         for (auto test_file: lst_files)
         {
             std::unordered_map<int, std::vector<double>> dict_query_acc = this->hit_ratio_heap(test_file, lst_budget, lst_top_k, lst_type, index_path, query_set_path);
             for (std::pair<int, std::vector<double>> element : dict_query_acc)
             {
-                std::cout << "A\n";
                 int top_k = element.first;
                 std::vector<double> lst_query_acc = element.second;
-                std::cout << "B\n";
                 for (int i = 0; i < lst_budget.size(); ++i)
                 {
-                    std::cout << "C\n";
                     if (lst_query_acc.at(i) != -1)
                     {
-                        std::cout << "D\n";
-                        std::cout << "dict_aux_lst[top_k]->at(i) " << dict_aux_lst[top_k]->at(i) << '\n';
-                        dict_aux_lst[top_k].at(i)->emplace_back(lst_query_acc.at(i));
-                        std::cout << "E\n";
+                        // std::cout << "dict_aux_lst[top_k]->at(i) " << dict_aux_lst[top_k]->at(i) << '\n';
+                        dict_aux_lst[top_k]->at(i)->emplace_back(lst_query_acc.at(i));
                     }
                 }
+            }
+            cnt_file += 1;
+            if (cnt_file % 100 == 0)
+            {
+                time_t my_time = time(NULL);
+                printf("%d files processed, time: %s\n", cnt_file, ctime(&my_time));
             }
         }
 
@@ -415,10 +422,16 @@ class HitRatioHeap {
             }
         }
 
-        for (std::pair<int, std::vector<double>> element: dict_avg_acc)
+//        for (std::pair<int, std::vector<double>> element: dict_avg_acc)
+//        {
+//            int top_k = element.first;
+//            std::vector<double> v = element.second;
+//            std::cout << "When k = " << top_k << '\n';
+//            print<double>(v);
+//        }
+        for (auto top_k: lst_top_k)
         {
-            int top_k = element.first;
-            std::vector<double> v = element.second;
+            std::vector<double> v = dict_avg_acc[top_k];
             std::cout << "When k = " << top_k << '\n';
             print<double>(v);
         }

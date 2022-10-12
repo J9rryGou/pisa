@@ -40,9 +40,12 @@ int main(int argc, const char** argv) {
     HitRatioHeap tmp_obj;
 
     std::string query_name = "1017_blond blue eye girl hair with";
-    std::vector lst_budget = {500, 1000, 2000, 3000, 4000, 5000};
-    std::vector lst_top_k = {10, 100, 1000};
-    std::vector lst_type2 = {1, 2, 3, 4};
+    // std::vector<int> lst_budget = {500, 1000, 2000, 3000, 4000, 5000};
+    std::vector<int> lst_budget = {500, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 12000, 15000,
+                                   18000, 25000, 35000, 50000, 65000, 80000, 100000, 120000, 140000, 160000,
+                                   180000, 200000, 225000, 250000, 275000, 300000, 350000, 400000, 500000};
+    std::vector<int> lst_top_k = {10, 100, 1000};
+    std::vector<int> lst_type2 = {1, 2, 3, 4};
     std::string index_path = "/home/jg6226/data/Hit_Ratio_Project/First_Layer_Index/20K/Add_Both_Pair";
     std::string query_set_path = "/home/jg6226/data/Hit_Ratio_Project/Split_Test_Output";
     std::unordered_map<int, std::vector<double>> result = tmp_obj.hit_ratio_heap(query_name, lst_budget, lst_top_k, lst_type2, index_path, query_set_path);
@@ -53,15 +56,20 @@ int main(int argc, const char** argv) {
 
     for (auto top_k: {10, 100, 1000})
     {
-        std::cout << top_k << '\n';
+        std::cout << top_k << "\n";
         for (int i = 0; i < result[top_k].size(); ++i)
         {
             std::cout << result[top_k].at(i) << " ";
         }
-        std::cout << '\n';
+        std::cout << "\n";
     }
 
+    clock_t start, end;
+    start = clock();
     tmp_obj.compute_heap_accuracy(query_set_path, lst_budget, lst_top_k, lst_type2, index_path);
+    end = clock();
+    double running_time = double(end - start) / double(CLOCKS_PER_SEC);
+    std::cout << "Runting time of compute hit ratio (heap): " << running_time << "s\n";
 
 
     //    for (auto element: result)

@@ -31,6 +31,7 @@ using SubStructure = std::tuple<QueryStr, QueryStr, QueryStr, QueryStr>;
 #include <cstdlib>
 #include <ctime>
 #include <numeric>
+
 // #include "utils.hpp"
 
 template <typename item>
@@ -100,6 +101,7 @@ struct obj_posting
     double impact_score;
     instream_ptr file_reader;
     obj_posting(std::string did, double impact_score, instream_ptr file_reader)
+
         : did(did), impact_score(impact_score), file_reader(file_reader)
     {}
     bool operator<(const obj_posting & rhs) const
@@ -330,7 +332,7 @@ class HitRatioHeap {
                 else
                 {
                     // std::cout << "For top_k = " << top_k << ": " << lst_intersection.size() << " " << lst_real.size() << " " << "acc is " << double(lst_intersection.size()) / double(lst_real.size()) << '\n';
-                    dict_query_acc[top_k].emplace_back(double(a) / double(lst_real.size()));
+                    dict_query_acc[top_k].emplace_back(double(lst_intersection.size()) / double(lst_real.size()));
                 }
             }
 
@@ -387,12 +389,12 @@ class HitRatioHeap {
         }
 
         std::unordered_map<int, std::vector<double>> dict_avg_acc = {};
-        std::unordered_map<int, std::vector<std::vector<double>>> dict_aux_lst = {};
+        std::unordered_map<int, std::vector<std::vector<double>*>*> dict_aux_lst = {};
 
         for (auto top_k: lst_top_k)
         {
             dict_avg_acc[top_k] = {};
-            std::vector<std::vector<double>> tmp_vec = {};
+            std::vector<std::vector<double>*> * tmp_vec = new std::vector<std::vector<double>*>;
             dict_aux_lst[top_k] = tmp_vec;
         }
 
@@ -400,8 +402,8 @@ class HitRatioHeap {
         {
             for (int i = 0; i < lst_budget.size(); ++i)
             {
-                std::vector<double> tmp_vec = {};
-                dict_aux_lst[top_k].emplace_back(tmp_vec);
+                std::vector<double> * tmp_vec = new std::vector<double>;
+                dict_aux_lst[top_k]->emplace_back(tmp_vec);
             }
         }
 
@@ -415,7 +417,7 @@ class HitRatioHeap {
                 std::vector<double> lst_query_acc = element.second;
                 for (int i = 0; i < lst_budget.size(); ++i)
                 {
-                    if (lst_query_acc[i] != -1)
+                    if (lst_query_acc.at(i) != -1)
                     {
                         dict_aux_lst[top_k][i].emplace_back(lst_query_acc[i]);
                     }
@@ -429,7 +431,7 @@ class HitRatioHeap {
             }
         }
 
-        for (std::pair<int, std::vector<std::vector<double>>> element: dict_aux_lst)
+        for (std::pair<int, std::vector<std::vector<double>*>*> element: dict_aux_lst)
         {
             int top_k = element.first;
             std::vector<std::vector<double>> v = element.second;

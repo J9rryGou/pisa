@@ -24,11 +24,14 @@ using SubStructure = std::tuple<QueryStr, QueryStr, QueryStr, QueryStr>;
 
 #include <dirent.h>
 #include <typeinfo>
+#include <range/v3/all.hpp>
 
 // function for print time
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
+#include <numeric>
+
 // #include "utils.hpp"
 
 template <typename item>
@@ -46,7 +49,7 @@ void makeCombiUtil(std::vector<std::string >& ans,
     // left will be 1
     for (int i = left; i < n; ++i)
     {
-        tmp.push_back(q_terms.at(i));
+        tmp.push_back(q_terms[i]);
         makeCombiUtil<item>(ans, tmp, q_terms, n, i + 1, k - 1);
 
         // Popping out last inserted element
@@ -91,19 +94,16 @@ SubStructure get_grams(std::vector<std::string> & q_terms, std::vector<int> & ls
 }
 
 //static struct obj_posting
+using instream_ptr = std::shared_ptr<std::ifstream>;
 struct obj_posting
 {
     std::string did;
     double impact_score;
-    std::ifstream * file_reader;
-    obj_posting(std::string did, double impact_score, std::ifstream * file_reader)
+    instream_ptr file_reader;
+    obj_posting(std::string did, double impact_score, instream_ptr file_reader)
+
         : did(did), impact_score(impact_score), file_reader(file_reader)
     {}
-    //    obj_posting(std::string did, double impact_score, std::ifstream * file_reader) {
-    //        this->did = did;
-    //        this->impact_score = impact_score;
-    //        this->file_reader = file_reader;
-    //    }
     bool operator<(const obj_posting & rhs) const
     {
         return this->impact_score < rhs.impact_score;
@@ -131,34 +131,14 @@ struct compare
 std::vector<std::string> intersection(std::vector<std::string> & v1,
                                       std::vector<std::string> & v2){
     std::vector<std::string> v3;
-
-    // std::cout << "v1 size: " << v1.size() << ". v2 size: " << v2.size() << '\n';
-
     std::sort(v1.begin(), v1.end());
     std::sort(v2.begin(), v2.end());
 
     std::set_intersection(v1.begin(),v1.end(),
                           v2.begin(),v2.end(),
                           back_inserter(v3));
-
-    //    std::set_intersection(v1.begin(),v1.end(),
-    //                          v2.begin(),v2.end(),
-    //                          back_inserter(v3));
-
     std::sort(v3.begin(), v3.end());
-    // std::cout << "v3 size: " << v3.size() << '\n';
     return v3;
-}
-
-template <typename sum_type>
-sum_type vec_sum(std::vector<sum_type> & v)
-{
-    sum_type result;
-    for (auto i: v)
-    {
-        result += i;
-    }
-    return result;
 }
 
 template <typename v_type>
@@ -189,7 +169,7 @@ class HitRatioHeap {
         boost::split(tmp_string, query_name, boost::is_any_of("_"));
         boost::split(q_terms, tmp_string.back(), boost::is_any_of(" "));
         SubStructure sub_structure = get_grams(q_terms, lst_type);
-        std::vector<std::ifstream *> f_grams;
+        std::vector<instream_ptr> f_grams;
         std::vector<std::string> f_names;
         int cnt_valid_gram = 0;
         for (auto & i : std::get<0>(sub_structure))
@@ -201,7 +181,7 @@ class HitRatioHeap {
                 ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/single/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
-                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/single/" + filename);
+                instream_ptr tmp_file_reader(new std::ifstream(index_path + "/single/" + filename));
                 f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/single/" + filename));
             }
@@ -216,7 +196,7 @@ class HitRatioHeap {
                 ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/duplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
-                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/duplet/" + filename);
+                instream_ptr tmp_file_reader(new std::ifstream(index_path + "/duplet/" + filename));
                 f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/duplet/" + filename));
             }
@@ -231,7 +211,7 @@ class HitRatioHeap {
                 ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/triplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
-                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/triplet/" + filename);
+                instream_ptr tmp_file_reader(new std::ifstream(index_path + "/triplet/" + filename));
                 f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/triplet/" + filename));
             }
@@ -246,7 +226,7 @@ class HitRatioHeap {
                 ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/quadruplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
-                std::ifstream * tmp_file_reader = new std::ifstream(index_path + "/quadruplet/" + filename);
+                instream_ptr tmp_file_reader(new std::ifstream(index_path + "/quadruplet/" + filename));
                 f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/quadruplet/" + filename));
             }
@@ -317,6 +297,48 @@ class HitRatioHeap {
         // in order to compute MAP and MRR, use a temp dic to see whether a did is in top k;
         // std::unordered_map<int, std::unordered_map<>> dict_top_k;
         std::unordered_map<int, std::vector<double>> dict_query_acc;
+//#define TEST_SLICE
+#ifdef TEST_SLICE
+        for (auto top_k: lst_top_k)
+        {
+            dict_query_acc[top_k] = {};
+            int real_len_to_slice = std::min(top_k, int(lst_real_did.size()));
+            auto lst_real = lst_real_did | ranges::views::slice(0, real_len_to_slice);
+//            std::vector<std::string> bbb;
+//            for(auto & i : lst_real)
+//            {
+//                bbb.push_back(i);
+//            }
+            for (auto temp_budget: lst_budget)
+            {
+                int pred_len_to_slice = std::min(temp_budget, int(lst_pred_did.size()));
+                auto lst_pred = lst_pred_did | ranges::views::slice(0, pred_len_to_slice);
+                ranges::sort(lst_pred);
+                ranges::sort(lst_real);
+                auto lst_intersection = ranges::views::set_intersection(lst_real, lst_pred);
+                std::vector<std::string> bbb;
+                for(auto & i : lst_real)
+                {
+                    bbb.push_back(i);
+                }
+                int a = 0;
+                ranges::for_each(lst_intersection, [&a](std::string & s){a++;});
+                int b = lst_real.size();
+                if (lst_real.empty())
+                {
+                    // dict_query_acc[top_k].emplace_back(NULL);
+                    dict_query_acc[top_k].emplace_back(-1.0);
+                }
+                else
+                {
+                    // std::cout << "For top_k = " << top_k << ": " << lst_intersection.size() << " " << lst_real.size() << " " << "acc is " << double(lst_intersection.size()) / double(lst_real.size()) << '\n';
+                    dict_query_acc[top_k].emplace_back(double(lst_intersection.size()) / double(lst_real.size()));
+                }
+            }
+
+        }
+#endif
+#ifndef TEST_SLICE
         for (auto top_k: lst_top_k)
         {
             dict_query_acc[top_k] = {};
@@ -330,6 +352,8 @@ class HitRatioHeap {
                 std::vector<std::string> lst_pred = std::vector<std::string>(lst_pred_did.begin(), lst_pred_did.begin() + pred_len_to_slice);
                 // std::vector<std::string> lst_pred = std::vector<std::string>(lst_pred_did.begin(), lst_pred_did.begin() + pred_len_to_slice);
                 std::vector<std::string> lst_intersection = intersection(lst_real, lst_pred);
+                int c = lst_intersection.size();
+                int b = lst_real.size();
                 if (lst_real.size() == 0)
                 {
                     // dict_query_acc[top_k].emplace_back(NULL);
@@ -343,6 +367,7 @@ class HitRatioHeap {
             }
 
         }
+#endif
         return dict_query_acc;
     }
 
@@ -356,16 +381,12 @@ class HitRatioHeap {
         char* qsp = const_cast<char*>(query_set_path.c_str());
         dpdf = opendir(qsp);
         if (dpdf != NULL) {
-            while (epdf = readdir(dpdf)) {
+            epdf = readdir(dpdf);
+            while (epdf != nullptr) {
                 lst_files.emplace_back(std::string(epdf->d_name));
+                epdf = readdir(dpdf);
             }
         }
-
-//        std::sort(lst_files.begin(), lst_files.end());
-//        for (auto filename: lst_files)
-//        {
-//            std::cout << filename << '\n';
-//        }
 
         std::unordered_map<int, std::vector<double>> dict_avg_acc = {};
         std::unordered_map<int, std::vector<std::vector<double>*>*> dict_aux_lst = {};
@@ -398,8 +419,7 @@ class HitRatioHeap {
                 {
                     if (lst_query_acc.at(i) != -1)
                     {
-                        // std::cout << "dict_aux_lst[top_k]->at(i) " << dict_aux_lst[top_k]->at(i) << '\n';
-                        dict_aux_lst[top_k]->at(i)->emplace_back(lst_query_acc.at(i));
+                        dict_aux_lst[top_k][i].emplace_back(lst_query_acc[i]);
                     }
                 }
             }
@@ -414,21 +434,13 @@ class HitRatioHeap {
         for (std::pair<int, std::vector<std::vector<double>*>*> element: dict_aux_lst)
         {
             int top_k = element.first;
-            std::vector<std::vector<double>*>* v = element.second;
-            for (int i = 0; i < v->size(); ++i)
+            std::vector<std::vector<double>> v = element.second;
+            for (auto & i : v)
             {
-                double sum_of_acc = vec_sum<double>(*v->at(i));
-                dict_avg_acc[top_k].emplace_back(sum_of_acc / v->at(i)->size());
+                double sum_of_acc = std::accumulate(i.begin(), i.end(), 0);
+                dict_avg_acc[top_k].emplace_back(sum_of_acc / i.size());
             }
         }
-
-//        for (std::pair<int, std::vector<double>> element: dict_avg_acc)
-//        {
-//            int top_k = element.first;
-//            std::vector<double> v = element.second;
-//            std::cout << "When k = " << top_k << '\n';
-//            print<double>(v);
-//        }
         for (auto top_k: lst_top_k)
         {
             std::vector<double> v = dict_avg_acc[top_k];

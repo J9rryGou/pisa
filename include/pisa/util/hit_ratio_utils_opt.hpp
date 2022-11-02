@@ -6,7 +6,6 @@
 //
 //template <typename item>
 //std::vector<std::string > makeCombi(std::vector<item> & q_terms, int k);
-
 #include "algorithm"
 #include "iostream"
 #include "fstream"
@@ -100,10 +99,11 @@ struct obj_posting
 {
     std::string did;
     double impact_score;
-    instream_ptr file_reader;
-    obj_posting(std::string did, double impact_score, instream_ptr file_reader)
+    // instream_ptr file_reader;
+    int fgram_index;
+    obj_posting(std::string did, double impact_score, int fgram_index)
 
-        : did(did), impact_score(impact_score), file_reader(file_reader)
+        : did(did), impact_score(impact_score), fgram_index(fgram_index)
     {}
     bool operator<(const obj_posting & rhs) const
     {
@@ -170,80 +170,132 @@ class HitRatioHeap {
         boost::split(tmp_string, query_name, boost::is_any_of("_"));
         boost::split(q_terms, tmp_string.back(), boost::is_any_of(" "));
         SubStructure sub_structure = get_grams(q_terms, lst_type);
-        std::vector<instream_ptr> f_grams;
+        // std::vector<instream_ptr> f_grams;
         std::vector<std::string> f_names;
         int cnt_valid_gram = 0;
+        // int fgram_index = 0;
+
+
+        std::vector<std::vector<std::string>> fgram_content;
+        std::vector<int> fgram_size;
+        std::string tmp_line;
+        int tmp_size = 0;
+
+//        std::cout << "A\n";
+//        for (auto & i : std::get<0>(sub_structure)) {
+//            std::cout << i << '\n';
+//        }
+
         for (auto & i : std::get<0>(sub_structure))
         {
+            std::cout << i << '\n';
             std::string filename = "SINGLE_" + i;
+            std::cout << filename << '\n';
             if(std::filesystem::exists(index_path + "/single/" + filename))
             {
                 f_names.emplace_back(filename);
-                ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/single/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
                 instream_ptr tmp_file_reader(new std::ifstream(index_path + "/single/" + filename));
-                f_grams.emplace_back(tmp_file_reader);
+                // f_grams.emplace_back(tmp_file_reader);
                 // f_grams.emplace_back(&std::ifstream(index_path + "/single/" + filename));
+                tmp_size = 0;
+                while (std::getline(*tmp_file_reader, tmp_line))
+                {
+                    std::cout << tmp_line << '\n';
+                    fgram_content[cnt_valid_gram].emplace_back(tmp_line);
+                    ++tmp_size;
+                }
+                fgram_size.emplace_back(tmp_size);
+                ++cnt_valid_gram;
+                tmp_file_reader->close();
             }
         }
-
+        std::cout << "B\n";
         for (auto & i : std::get<1>(sub_structure))
         {
             std::string filename = "DUPLET_" + i;
             if(std::filesystem::exists(index_path + "/duplet/" + filename))
             {
                 f_names.emplace_back(filename);
-                ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/duplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
                 instream_ptr tmp_file_reader(new std::ifstream(index_path + "/duplet/" + filename));
-                f_grams.emplace_back(tmp_file_reader);
+                // f_grams.emplace_back(tmp_file_reader);
+                tmp_size = 0;
+                while (std::getline(*tmp_file_reader, tmp_line))
+                {
+                    fgram_content[cnt_valid_gram].emplace_back(tmp_line);
+                    ++tmp_size;
+                }
+                fgram_size.emplace_back(tmp_size);
+                ++cnt_valid_gram;
+                tmp_file_reader->close();
                 // f_grams.emplace_back(&std::ifstream(index_path + "/duplet/" + filename));
             }
         }
 
+        std::cout << "C\n";
         for (auto & i : std::get<2>(sub_structure))
         {
             std::string filename = "TRIPLET_" + i;
             if(std::filesystem::exists(index_path + "/triplet/" + filename))
             {
                 f_names.emplace_back(filename);
-                ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/triplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
                 instream_ptr tmp_file_reader(new std::ifstream(index_path + "/triplet/" + filename));
-                f_grams.emplace_back(tmp_file_reader);
+                // f_grams.emplace_back(tmp_file_reader);
+                tmp_size = 0;
+                while (std::getline(*tmp_file_reader, tmp_line))
+                {
+                    fgram_content[cnt_valid_gram].emplace_back(tmp_line);
+                    ++tmp_size;
+                }
+                fgram_size.emplace_back(tmp_size);
+                ++cnt_valid_gram;
+                tmp_file_reader->close();
                 // f_grams.emplace_back(&std::ifstream(index_path + "/triplet/" + filename));
             }
         }
 
+        std::cout << "D\n";
         for (auto & i : std::get<3>(sub_structure))
         {
             std::string filename = "QUADRUPLET_" + i;
             if(std::filesystem::exists(index_path + "/quadruplet/" + filename))
             {
                 f_names.emplace_back(filename);
-                ++cnt_valid_gram;
                 // std::ifstream tmp_file_reader(index_path + "/quadruplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
                 instream_ptr tmp_file_reader(new std::ifstream(index_path + "/quadruplet/" + filename));
-                f_grams.emplace_back(tmp_file_reader);
+                // f_grams.emplace_back(tmp_file_reader);
+                tmp_size = 0;
+                while (std::getline(*tmp_file_reader, tmp_line))
+                {
+                    fgram_content[cnt_valid_gram].emplace_back(tmp_line);
+                    ++tmp_size;
+                }
+                fgram_size.emplace_back(tmp_size);
+                ++cnt_valid_gram;
+                tmp_file_reader->close();
                 // f_grams.emplace_back(&std::ifstream(index_path + "/quadruplet/" + filename));
             }
         }
+        // all grams have not been read
+        int fgram_current_index[cnt_valid_gram];
+        for (int i = 0; i < cnt_valid_gram; ++i)
+            fgram_current_index[i] = 0;
 
         // std::priority_queue<obj_posting, std::vector<obj_posting>, compare> hp_posting;
         std::priority_queue<obj_posting> hp_posting;
+        std::string line;
 
-        for(auto i : f_grams)
-        {
-            std::string line;
-            std::getline(*i, line);
-            // std::cout << line.empty() << '\n';
-            // std::cout << line << '\n';
-            if (!line.empty())
-            {
+        for (int i = 0; i < cnt_valid_gram; ++i) {
+            // if this gram have some result
+            if (fgram_size[i] > 0) {
+                line = fgram_content[i][0];
+                ++fgram_current_index[i];
                 std::vector<std::string> line_list;
                 boost::algorithm::trim(line);
                 boost::split(line_list, line, boost::is_any_of(" "));
@@ -252,8 +304,8 @@ class HitRatioHeap {
                 hp_posting.push(obj_posting(line_list[1], score_raw, i));
             }
         }
-
         std::vector<std::string> lst_pred_did;
+        int current_fgram_identifier;
         while (!hp_posting.empty() && max_budget > 0)
         {
             obj_posting current_obj = hp_posting.top();
@@ -261,29 +313,26 @@ class HitRatioHeap {
             // std::cout << "Debugging:" << current_obj.did << '\n';
             lst_pred_did.emplace_back(current_obj.did);
             --max_budget;
+            current_fgram_identifier = current_obj.fgram_index;
 
-            std::string line;
-            std::getline(*current_obj.file_reader, line);
-            if (!line.empty())
+            // if there are some more results of this gram
+            if (fgram_size[current_fgram_identifier] > fgram_current_index[current_fgram_identifier])
             {
+                line = fgram_content[current_fgram_identifier][fgram_current_index[current_fgram_identifier]];
+                ++fgram_current_index[current_fgram_identifier];
                 std::vector<std::string> line_list;
                 boost::algorithm::trim(line);
                 boost::split(line_list, line, boost::is_any_of(" "));
                 double score_raw = std::stod(line_list[2]);
-                hp_posting.push(obj_posting(line_list[1], score_raw, current_obj.file_reader));
+                hp_posting.push(obj_posting(line_list[1], score_raw, current_fgram_identifier));
             }
-        }
 
-        for(auto i : f_grams)
-        {
-            i->close();
         }
 
         int max_top_k = *std::max_element(lst_top_k.begin(), lst_top_k.end());
         std::vector<std::string> lst_real_did;
         std::ifstream f_real_output(query_out_path + '/' + query_name);
         int cnt_top = 0;
-        std::string line;
         // std::getline(f_real_output, line);
         while (std::getline(f_real_output, line) && cnt_top < max_top_k)
         {
@@ -305,11 +354,11 @@ class HitRatioHeap {
             dict_query_acc[top_k] = {};
             int real_len_to_slice = std::min(top_k, int(lst_real_did.size()));
             auto lst_real = lst_real_did | ranges::views::slice(0, real_len_to_slice);
-//            std::vector<std::string> bbb;
-//            for(auto & i : lst_real)
-//            {
-//                bbb.push_back(i);
-//            }
+            //            std::vector<std::string> bbb;
+            //            for(auto & i : lst_real)
+            //            {
+            //                bbb.push_back(i);
+            //            }
             for (auto temp_budget: lst_budget)
             {
                 int pred_len_to_slice = std::min(temp_budget, int(lst_pred_did.size()));

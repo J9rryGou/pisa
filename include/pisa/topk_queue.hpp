@@ -18,6 +18,7 @@ namespace pisa {
 /// `topk()`.
 struct topk_queue {
     using entry_type = std::pair<Score, DocId>;
+    using entry_type_termwise = std::tuple<Score, DocId, std::vector<Score>>;
 
     /// Constructs a top-k priority queue with the given intitial threshold.
     ///
@@ -62,6 +63,29 @@ struct topk_queue {
         return true;
     }
 
+    auto insert_termwise(Score score, std::vector<Score> termwise, DocId docid = 0) -> bool
+    {
+        if (PISA_UNLIKELY(not would_enter(score))) {
+            return false;
+        }
+        m_q.emplace_back(score, docid);
+        t_q.emplace_back(score, docid, termwise);
+        if (PISA_UNLIKELY(m_q.size() <= m_k)) {
+            std::push_heap(m_q.begin(), m_q.end(), min_heap_order);
+            std::push_heap(t_q.begin(), t_q.end(), min_vec_heap_order);
+            if (PISA_UNLIKELY(m_q.size() == m_k)) {
+                m_effective_threshold = m_q.front().first;
+            }
+        } else {
+            std::pop_heap(m_q.begin(), m_q.end(), min_heap_order);
+            std::pop_heap(t_q.begin(), t_q.end(), min_vec_heap_order);
+            t_q.pop_back();
+            m_q.pop_back();
+            m_effective_threshold = m_q.front().first;
+        }
+        return true;
+    }
+
     /// Checks if an entry with the given score would be inserted to the queue, according
     /// to the current threshold.
     bool would_enter(float score) const { return score > m_effective_threshold; }
@@ -79,7 +103,15 @@ struct topk_queue {
                           0,
                           [](std::pair<Score, DocId> l, Score r) { return l.first > r; })
             - m_q.begin();
+        std::sort_heap(t_q.begin(), t_q.end(), min_vec_heap_order);
+        size_t t_size = std::lower_bound(
+                            t_q.begin(),
+                            t_q.end(),
+                            0,
+                            [](std::tuple<Score, DocId, std::vector<Score>> l, Score r) { return std::get<0>(l) > r; })
+            - t_q.begin();
         m_q.resize(size);
+        t_q.resize(t_size);
     }
 
     /// Returns a reference to the contents of the heap.
@@ -87,6 +119,10 @@ struct topk_queue {
     /// This is intended to be used after calling `finalize()` first, which will sort
     /// the results in order of descending scores.
     [[nodiscard]] std::vector<entry_type> const& topk() const noexcept { return m_q; }
+
+    [[nodiscard]] std::vector<entry_type_termwise> const& topk_termwise() const noexcept {
+        return t_q;
+    }
 
     /// Returns the threshold based on the heap state, defined as the score of the `k`-th document,
     /// or 0.0 if the heap is not full.
@@ -132,9 +168,16 @@ struct topk_queue {
         return lhs.first > rhs.first;
     }
 
+    [[nodiscard]] constexpr static auto
+    min_vec_heap_order(entry_type_termwise const& lhs, entry_type_termwise const& rhs) noexcept -> bool
+    {
+        return std::get<0>(lhs) > std::get<0>(rhs);
+    }
+
     std::size_t m_k;
     float m_initial_threshold;
     std::vector<entry_type> m_q;
+    std::vector<entry_type_termwise> t_q;
     float m_effective_threshold;
 };
 

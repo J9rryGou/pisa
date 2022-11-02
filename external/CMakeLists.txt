@@ -87,9 +87,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/spdlog)
 # Add range-v3
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/range-v3)
 
-# Add cppitertools
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/cppitertools)
-
 # Add RapidCheck
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/rapidcheck)
 target_compile_options(rapidcheck PRIVATE -Wno-error)

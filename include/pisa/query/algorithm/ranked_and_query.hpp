@@ -2,7 +2,7 @@
 
 #include "query/queries.hpp"
 #include "topk_queue.hpp"
-#include <vector>
+#include "vector"
 
 namespace pisa {
 
@@ -42,17 +42,28 @@ struct ranked_and_query {
 
             if (i == ordered_cursors.size()) {
                 float score = 0;
+                std::vector<Score> termwise_score(ordered_cursors.size(), 0);
                 for (i = 0; i < ordered_cursors.size(); ++i) {
                     score += ordered_cursors[i]->score();
+                    // add original cursor to keep the order of alphabetic
+                    termwise_score[i] += cursors[i].score();
+                    //                    if (candidate == 17342170)
+                    //                        std::cout << "i: " << i << ", term_score = " << ordered_cursors[i]->score() << '\n';
                 }
 
-                m_topk.insert(score, ordered_cursors[0]->docid());
+                m_topk.insert_termwise(score, termwise_score, ordered_cursors[0]->docid());
                 ordered_cursors[0]->next();
                 candidate = ordered_cursors[0]->docid();
                 i = 1;
             }
         }
+
+
+        //        for (auto& ts: cursors) {
+        //            std::cout << ts.m
+        //        }
     }
+
 
     std::vector<typename topk_queue::entry_type> const& topk() const { return m_topk.topk(); }
 

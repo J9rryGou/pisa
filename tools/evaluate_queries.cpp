@@ -26,9 +26,21 @@
 #include "util/util.hpp"
 #include "wand_data_compressed.hpp"
 #include "wand_data_raw.hpp"
+#include "boost/algorithm/string/join.hpp"
 
 using namespace pisa;
 using ranges::views::enumerate;
+
+#include <sstream>
+
+template <typename T>
+std::string to_string_with_precision(const T a_value, const int n = 7)
+{
+    std::ostringstream out;
+    out.precision(n);
+    out << std::fixed << a_value;
+    return out.str();
+}
 
 template <typename IndexType, typename WandType>
 void evaluate_queries(
@@ -43,13 +55,17 @@ void evaluate_queries(
     ScorerParams const& scorer_params,
     const bool weighted,
     std::string const& run_id,
-    std::string const& iteration)
+    std::string const& iteration,
+    std::string const& out_file,
+    bool const& use_did,
+    bool const& termwise)
 {
     IndexType index(MemorySource::mapped_file(index_filename));
     WandType const wdata(MemorySource::mapped_file(wand_data_filename));
 
     auto scorer = scorer::from_params(scorer_params, wdata);
     std::function<std::vector<typename topk_queue::entry_type>(Query)> query_fun;
+    std::function<std::vector<typename topk_queue::entry_type_termwise>(Query)> query_fun1;
 
     if (query_type == "wand") {
         query_fun = [&](Query query) {
@@ -97,6 +113,13 @@ void evaluate_queries(
             topk.finalize();
             return topk.topk();
         };
+        query_fun1 = [&](Query query) {
+            topk_queue topk(k);
+            ranked_and_query ranked_and_q(topk);
+            ranked_and_q(make_scored_cursors(index, *scorer, query, weighted), index.num_docs());
+            topk.finalize();
+            return topk.topk_termwise();
+        };
     } else if (query_type == "ranked_or") {
         query_fun = [&](Query query) {
             topk_queue topk(k);
@@ -140,26 +163,152 @@ void evaluate_queries(
     auto docmap = Payload_Vector<>::from(*source);
 
     std::vector<std::vector<typename topk_queue::entry_type>> raw_results(queries.size());
+    std::vector<std::vector<typename topk_queue::entry_type_termwise>> raw_results_termwise(queries.size());
     auto start_batch = std::chrono::steady_clock::now();
-    tbb::parallel_for(size_t(0), queries.size(), [&, query_fun](size_t query_idx) {
-        raw_results[query_idx] = query_fun(queries[query_idx]);
+    //    tbb::parallel_for(size_t(0), queries.size(), [&, query_fun](size_t query_idx) {
+    //        raw_results[query_idx] = query_fun(queries[query_idx]);
+    //    });
+    tbb::parallel_for(size_t(0), queries.size(), [&, query_fun1](size_t query_idx) {
+        raw_results_termwise[query_idx] = query_fun1(queries[query_idx]);
     });
     auto end_batch = std::chrono::steady_clock::now();
 
-    for (size_t query_idx = 0; query_idx < raw_results.size(); ++query_idx) {
-        auto results = raw_results[query_idx];
-        auto qid = queries[query_idx].id;
-        for (auto&& [rank, result]: enumerate(results)) {
-            std::cout << fmt::format(
-                "{}\t{}\t{}\t{}\t{}\t{}\n",
-                qid.value_or(std::to_string(query_idx)),
-                iteration,
-                docmap[result.second],
-                rank,
-                result.first,
-                run_id);
+    if (termwise) {
+        if (out_file.length() > 0)
+        {
+            std::ofstream file_output(out_file);
+            for (size_t query_idx = 0; query_idx < raw_results.size(); ++query_idx) {
+                auto results = raw_results_termwise[query_idx];
+                auto qid = queries[query_idx].id;
+                for (auto&& [rank, result]: enumerate(results)) {
+                    float sum = 0;
+                    std::vector<Score> termwise_score = std::get<2>(result);
+                    std::string termwise_str = "";
+                    std::for_each(termwise_score.begin(), termwise_score.end(),
+                                  [&termwise_str, &sum](Score x) mutable {
+                                  // [&termwise_str](Score x) mutable {
+                                      termwise_str += to_string_with_precision(x) + "|";
+                                      sum += x;
+                                  });
+                    // remove the last |
+                    termwise_str = termwise_str.substr(0, termwise_str.length()-1);
+
+                    file_output << fmt::format(
+                        "{}\t{}\t{}\t{}\t{}\t{}\n",
+                        termwise_str,
+                        qid.value_or(std::to_string(query_idx)),
+                        iteration,
+                        rank,
+                        use_did ? to_string(std::get<1>(result)) : docmap[std::get<1>(result)],
+                        // to_string_with_precision(std::get<0>(result))
+                        to_string_with_precision(sum)
+                        );
+                }
+                file_output << std::endl;
+            }
+            file_output.close();
+        }
+        else
+        {
+            //        for (size_t query_idx = 0; query_idx < raw_results.size(); ++query_idx) {
+            //            auto results = raw_results[query_idx];
+            //            auto qid = queries[query_idx].id;
+            //            for (auto&& [rank, result]: enumerate(results)) {
+            //
+            //                std::cout << fmt::format(
+            //                        "{}\t{}\t{}\t{}\t{}\t{}\n",
+            //                        qid.value_or(std::to_string(query_idx)),
+            //                        iteration,
+            //                        use_did ? to_string(result.second) : docmap[result.second],
+            //                        rank,
+            //                        result.first,
+            //                        run_id);
+            //            }
+            //        }
+            for (size_t query_idx = 0; query_idx < raw_results_termwise.size(); ++query_idx) {
+                auto results = raw_results_termwise[query_idx];
+                auto qid = queries[query_idx].id;
+                for (auto&& [rank, result]: enumerate(results)) {
+
+                    std::vector<Score> termwise_score = std::get<2>(result);
+                    std::string termwise_str = "";
+                    std::for_each(termwise_score.begin(), termwise_score.end(),
+                                  [&termwise_str](Score x) mutable {
+                                      termwise_str += to_string(x) + "|";
+                                  });
+                    // remove the last |
+                    termwise_str = termwise_str.substr(0, termwise_str.length()-1);
+
+                    std::cout << fmt::format(
+                        "{}\t{}\t{}\t{}\t{}\t{}\n",
+                        termwise_str,
+                        qid.value_or(std::to_string(query_idx)),
+                        iteration,
+                        rank,
+                        use_did ? to_string(std::get<1>(result)) : docmap[std::get<1>(result)],
+                        std::get<0>(result));
+                }
+                std::cout << std::endl;
+            }
         }
     }
+
+    else {
+        if (out_file.length() > 0)
+        {
+            std::ofstream file_output(out_file);
+            for (size_t query_idx = 0; query_idx < raw_results.size(); ++query_idx) {
+                auto results = raw_results_termwise[query_idx];
+                auto qid = queries[query_idx].id;
+                for (auto&& [rank, result]: enumerate(results)) {
+                    file_output << fmt::format(
+                        "{}\t{}\t{}\t{}\t{}\n",
+                        qid.value_or(std::to_string(query_idx)),
+                        iteration,
+                        rank,
+                        use_did ? to_string(std::get<1>(result)) : docmap[std::get<1>(result)],
+                        std::get<0>(result));
+                }
+                file_output << std::endl;
+            }
+            file_output.close();
+        }
+        else
+        {
+            //        for (size_t query_idx = 0; query_idx < raw_results.size(); ++query_idx) {
+            //            auto results = raw_results[query_idx];
+            //            auto qid = queries[query_idx].id;
+            //            for (auto&& [rank, result]: enumerate(results)) {
+            //
+            //                std::cout << fmt::format(
+            //                        "{}\t{}\t{}\t{}\t{}\t{}\n",
+            //                        qid.value_or(std::to_string(query_idx)),
+            //                        iteration,
+            //                        use_did ? to_string(result.second) : docmap[result.second],
+            //                        rank,
+            //                        result.first,
+            //                        run_id);
+            //            }
+            //        }
+            for (size_t query_idx = 0; query_idx < raw_results_termwise.size(); ++query_idx) {
+                auto results = raw_results_termwise[query_idx];
+                auto qid = queries[query_idx].id;
+                for (auto&& [rank, result]: enumerate(results)) {
+
+                    std::cout << fmt::format(
+                        "{}\t{}\t{}\t{}\t{}\n",
+                        qid.value_or(std::to_string(query_idx)),
+                        iteration,
+                        rank,
+                        use_did ? to_string(std::get<1>(result)) : docmap[std::get<1>(result)],
+                        std::get<0>(result));
+                }
+                std::cout << std::endl;
+            }
+        }
+    }
+
+
     auto end_print = std::chrono::steady_clock::now();
     double batch_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(end_batch - start_batch).count();
@@ -179,7 +328,10 @@ int main(int argc, const char** argv)
 
     std::string documents_file;
     std::string run_id = "R0";
+    std::string out_file = "";
+    bool use_doc_id = false;
     bool quantized = false;
+    bool termwise = false;
 
     App<arg::Index,
         arg::WandData<arg::WandMode::Required>,
@@ -191,7 +343,10 @@ int main(int argc, const char** argv)
         app{"Retrieves query results in TREC format."};
     app.add_option("-r,--run", run_id, "Run identifier");
     app.add_option("--documents", documents_file, "Document lexicon")->required();
+    app.add_option("-f,--file", out_file, "Output as file");
+    app.add_flag("-d,--docid", use_doc_id, "Use did instead of trec id");
     app.add_flag("--quantized", quantized, "Quantized scores");
+    app.add_flag("--termwise", termwise, "Output term score in alphabetical order at the beginning");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -216,7 +371,10 @@ int main(int argc, const char** argv)
         app.scorer_params(),
         app.weighted(),
         run_id,
-        iteration);
+        iteration,
+        out_file,
+        use_doc_id,
+        termwise);
 
     /**/
     if (false) {  // NOLINT

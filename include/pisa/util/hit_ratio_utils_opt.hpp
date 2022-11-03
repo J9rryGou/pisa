@@ -188,11 +188,12 @@ class HitRatioHeap {
 
         for (auto & i : std::get<0>(sub_structure))
         {
-            std::cout << i << '\n';
+            // std::cout << i << '\n';
             std::string filename = "SINGLE_" + i;
-            std::cout << filename << '\n';
+            // std::cout << filename << '\n';
             if(std::filesystem::exists(index_path + "/single/" + filename))
             {
+                std::vector<std::string> tmp_string_vec;
                 f_names.emplace_back(filename);
                 // std::ifstream tmp_file_reader(index_path + "/single/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
@@ -202,21 +203,24 @@ class HitRatioHeap {
                 tmp_size = 0;
                 while (std::getline(*tmp_file_reader, tmp_line))
                 {
-                    std::cout << tmp_line << '\n';
-                    fgram_content[cnt_valid_gram].emplace_back(tmp_line);
+                    // std::cout << tmp_line << '\n';
+                    tmp_string_vec.emplace_back(tmp_line);
+                    // fgram_content[cnt_valid_gram].emplace_back(tmp_line);
                     ++tmp_size;
                 }
+                fgram_content.emplace_back(tmp_string_vec);
                 fgram_size.emplace_back(tmp_size);
                 ++cnt_valid_gram;
                 tmp_file_reader->close();
             }
         }
-        std::cout << "B\n";
+        // std::cout << "B\n";
         for (auto & i : std::get<1>(sub_structure))
         {
             std::string filename = "DUPLET_" + i;
             if(std::filesystem::exists(index_path + "/duplet/" + filename))
             {
+                std::vector<std::string> tmp_string_vec;
                 f_names.emplace_back(filename);
                 // std::ifstream tmp_file_reader(index_path + "/duplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
@@ -225,9 +229,11 @@ class HitRatioHeap {
                 tmp_size = 0;
                 while (std::getline(*tmp_file_reader, tmp_line))
                 {
-                    fgram_content[cnt_valid_gram].emplace_back(tmp_line);
+                    tmp_string_vec.emplace_back(tmp_line);
+                    // fgram_content[cnt_valid_gram].emplace_back(tmp_line);
                     ++tmp_size;
                 }
+                fgram_content.emplace_back(tmp_string_vec);
                 fgram_size.emplace_back(tmp_size);
                 ++cnt_valid_gram;
                 tmp_file_reader->close();
@@ -235,12 +241,13 @@ class HitRatioHeap {
             }
         }
 
-        std::cout << "C\n";
+        // std::cout << "C\n";
         for (auto & i : std::get<2>(sub_structure))
         {
             std::string filename = "TRIPLET_" + i;
             if(std::filesystem::exists(index_path + "/triplet/" + filename))
             {
+                std::vector<std::string> tmp_string_vec;
                 f_names.emplace_back(filename);
                 // std::ifstream tmp_file_reader(index_path + "/triplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
@@ -249,9 +256,11 @@ class HitRatioHeap {
                 tmp_size = 0;
                 while (std::getline(*tmp_file_reader, tmp_line))
                 {
-                    fgram_content[cnt_valid_gram].emplace_back(tmp_line);
+                    tmp_string_vec.emplace_back(tmp_line);
+                    // fgram_content[cnt_valid_gram].emplace_back(tmp_line);
                     ++tmp_size;
                 }
+                fgram_content.emplace_back(tmp_string_vec);
                 fgram_size.emplace_back(tmp_size);
                 ++cnt_valid_gram;
                 tmp_file_reader->close();
@@ -259,12 +268,13 @@ class HitRatioHeap {
             }
         }
 
-        std::cout << "D\n";
+        // std::cout << "D\n";
         for (auto & i : std::get<3>(sub_structure))
         {
             std::string filename = "QUADRUPLET_" + i;
             if(std::filesystem::exists(index_path + "/quadruplet/" + filename))
             {
+                std::vector<std::string> tmp_string_vec;
                 f_names.emplace_back(filename);
                 // std::ifstream tmp_file_reader(index_path + "/quadruplet/" + filename);
                 // f_grams.emplace_back(&tmp_file_reader);
@@ -273,9 +283,11 @@ class HitRatioHeap {
                 tmp_size = 0;
                 while (std::getline(*tmp_file_reader, tmp_line))
                 {
-                    fgram_content[cnt_valid_gram].emplace_back(tmp_line);
+                    tmp_string_vec.emplace_back(tmp_line);
+                    // fgram_content[cnt_valid_gram].emplace_back(tmp_line);
                     ++tmp_size;
                 }
+                fgram_content.emplace_back(tmp_string_vec);
                 fgram_size.emplace_back(tmp_size);
                 ++cnt_valid_gram;
                 tmp_file_reader->close();
